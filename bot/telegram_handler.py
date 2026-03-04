@@ -130,8 +130,19 @@ class TelegramBot:
         # Initialize database before polling
         import asyncio
 
+        whitelist_ids = self._config["whitelist"]
+
         async def post_init(application):
             await init_db()
+            for user_id in whitelist_ids:
+                try:
+                    await application.bot.send_message(
+                        chat_id=user_id,
+                        text="Bot ist gestartet und bereit, Aufgaben zu empfangen.",
+                    )
+                except Exception as e:
+                    logger.warning("Could not send startup message to %d: %s", user_id, e)
+            logger.info("Startup messages sent.")
 
         app.post_init = post_init
 
