@@ -1,14 +1,17 @@
 import asyncio
 import logging
+import os
 import shutil
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 
 class ClaudeBridge:
-    def __init__(self, cli_path: str = "", timeout: int = 300):
+    def __init__(self, cli_path: str = "", timeout: int = 300, cwd: str = ""):
         self._cli = cli_path or shutil.which("claude") or "claude"
         self._timeout = timeout
+        self._cwd = cwd or str(Path(__file__).resolve().parent.parent)
 
     async def send_prompt(self, prompt: str, session_id: str) -> str:
         """Send a prompt to Claude Code CLI and return the response text."""
@@ -19,12 +22,17 @@ class ClaudeBridge:
             prompt,
         ]
 
+        # Remove CLAUDECODE env var so the subprocess doesn't think it's nested
+        env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
+
         logger.info("Running claude CLI with session %s", session_id)
         try:
             proc = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
+                env=env,
+                cwd=self._cwd,
             )
             stdout, stderr = await asyncio.wait_for(
                 proc.communicate(), timeout=self._timeout

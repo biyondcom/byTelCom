@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import aiosqlite
 import uuid
 from datetime import datetime, timedelta, timezone
