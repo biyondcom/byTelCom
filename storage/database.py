@@ -61,7 +61,7 @@ async def get_or_create_session(user_id: int, timeout_minutes: int) -> tuple[int
             await db.commit()
             return conv_id, session_id
 
-        session_id = uuid.uuid4().hex[:16]
+        session_id = str(uuid.uuid4())
         now = datetime.now(timezone.utc).isoformat()
         cursor = await db.execute(
             "INSERT INTO conversations (user_id, session_id, created_at, last_active) VALUES (?, ?, ?, ?)",
@@ -77,7 +77,7 @@ async def create_new_session(user_id: int) -> tuple[int, str]:
     """Force-create a new session for the user."""
     db = await _get_db()
     try:
-        session_id = uuid.uuid4().hex[:16]
+        session_id = str(uuid.uuid4())
         now = datetime.now(timezone.utc).isoformat()
         cursor = await db.execute(
             "INSERT INTO conversations (user_id, session_id, created_at, last_active) VALUES (?, ?, ?, ?)",
