@@ -16,7 +16,7 @@ async def _get_db() -> aiosqlite.Connection:
 
 async def init_db():
     db = await _get_db()
-    async with db:
+    try:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS conversations (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -37,7 +37,8 @@ async def init_db():
             )
         """)
         await db.commit()
-    await db.close()
+    finally:
+        await db.close()
 
 
 async def get_or_create_session(user_id: int, timeout_minutes: int) -> tuple[int, str]:
