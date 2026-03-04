@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import os
 import shutil
@@ -8,10 +9,12 @@ logger = logging.getLogger(__name__)
 
 
 class ClaudeBridge:
-    def __init__(self, cli_path: str = "", timeout: int = 300, cwd: str = ""):
+    def __init__(self, cli_path: str = "", timeout: int = 300, cwd: str = "",
+                 mcp_config: dict | None = None):
         self._cli = cli_path or shutil.which("claude") or "claude"
         self._timeout = timeout
         self._cwd = cwd or str(Path(__file__).resolve().parent.parent)
+        self._mcp_config = mcp_config
 
     async def send_prompt(self, prompt: str, session_id: str) -> str:
         """Send a prompt to Claude Code CLI and return the response text."""
@@ -19,8 +22,12 @@ class ClaudeBridge:
             self._cli,
             "--print",
             "--session-id", session_id,
-            prompt,
         ]
+
+        if self._mcp_config:
+            cmd.extend(["--mcp-config", json.dumps(self._mcp_config)])
+
+        cmd.append(prompt)
 
         # Remove CLAUDECODE env var so the subprocess doesn't think it's nested
         env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import logging
+import time
 
 from telegram import Update
 from telegram.constants import ChatAction, ParseMode
@@ -45,6 +47,7 @@ class TelegramBot:
         self._bridge = ClaudeBridge(
             cli_path=config["claude"].get("cli_path", ""),
             timeout=config["claude"].get("timeout", 300),
+            mcp_config=config["claude"].get("mcp_servers"),
         )
         self._max_msg_len = config["telegram"].get("max_message_length", 4096)
         self._session_timeout = config["session"].get("timeout_minutes", 60)
@@ -106,11 +109,35 @@ class TelegramBot:
         # Save user message
         await save_message(conv_id, "user", user_text)
 
-        # Send typing indicator
-        await update.message.chat.send_action(ChatAction.TYPING)
+        # Send periodic status updates while Claude is working
+        chat = update.message.chat
+        stop_typing = asyncio.Event()
+
+        async def _keep_alive():
+            start = time.monotonic()
+            while not stop_typing.is_set():
+                elapsed = int(time.monotonic() - start)
+                if elapsed == 0:
+                    await chat.send_action(ChatAction.TYPING)
+                else:
+                    mins, secs = divmod(elapsed, 60)
+                    ts = f"{mins}m {secs:02d}s" if mins else f"{secs}s"
+                    await chat.send_action(ChatAction.TYPING)
+                    await update.message.reply_text(f"⏳ Claude arbeitet noch... ({ts})")
+                try:
+                    await asyncio.wait_for(stop_typing.wait(), timeout=30)
+                    break
+                except asyncio.TimeoutError:
+                    pass
+
+        typing_task = asyncio.create_task(_keep_alive())
 
         # Call Claude
-        response = await self._bridge.send_prompt(user_text, session_id)
+        try:
+            response = await self._bridge.send_prompt(user_text, session_id)
+        finally:
+            stop_typing.set()
+            await typing_task
 
         # Save assistant response
         await save_message(conv_id, "assistant", response)
