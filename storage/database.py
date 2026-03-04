@@ -103,6 +103,22 @@ async def save_message(conversation_id: int, role: str, content: str):
         await db.close()
 
 
+async def get_conversation_messages(conversation_id: int, limit: int = 50) -> list[dict]:
+    """Return messages for a conversation as dicts with role/content (for API messages array)."""
+    db = await _get_db()
+    try:
+        rows = await db.execute_fetchall(
+            "SELECT role, content FROM messages "
+            "WHERE conversation_id = ? "
+            "ORDER BY id ASC "
+            "LIMIT ?",
+            (conversation_id, limit),
+        )
+        return [{"role": r[0], "content": r[1]} for r in rows]
+    finally:
+        await db.close()
+
+
 async def get_recent_messages(user_id: int, limit: int = 10) -> list[dict]:
     db = await _get_db()
     try:

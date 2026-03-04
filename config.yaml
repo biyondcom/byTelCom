@@ -12,24 +12,30 @@ whitelist:
   - 1301659279
   # - 987654321
 
-# Claude Code CLI settings
+# Claude API settings
 claude:
-  # Path to claude CLI (leave empty if in PATH)
-  cli_path: ""
+  # Anthropic API key (or set ANTHROPIC_API_KEY env var)
+  api_key: ""
 
-  # Timeout in seconds for Claude responses
+  # Model to use
+  model: "claude-sonnet-4-20250514"
+
+  # Max tokens per response
+  max_tokens: 16384
+
+  # Timeout in seconds
   timeout: 300
 
-  # Output format: "text" for --print, "stream-json" for --output-format stream-json
-  output_format: "text"
+  # System prompt
+  system_prompt: |
+    Du bist ein hilfreicher Assistent für byTelCom.
+    Du hast Zugriff auf MCP-Tools für CRM, Rechnungen, Lohnabrechnung und mehr.
+    Antworte auf Deutsch, es sei denn der Nutzer schreibt auf Englisch.
 
-  # MCP server config (passed via --mcp-config to Claude CLI)
-  mcp_servers:
-    mcpServers:
-      byMCP:
-        type: stdio
-        command: py
-        args: ["-3.14", "C:/Users/Micha/claude/byMCP/server.py"]
+  # MCP server (stdio)
+  mcp_server:
+    command: "py"
+    args: ["-3.14", "C:/Users/Micha/claude/byMCP/server.py"]
 
 # Session settings
 session:

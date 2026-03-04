@@ -16,6 +16,7 @@ from storage.database import (
     create_new_session,
     save_message,
     get_recent_messages,
+    get_conversation_messages,
 )
 
 logger = logging.getLogger(__name__)
@@ -44,11 +45,7 @@ class TelegramBot:
     def __init__(self, config: dict):
         self._config = config
         self._whitelist = WhitelistChecker(config["whitelist"])
-        self._bridge = ClaudeBridge(
-            cli_path=config["claude"].get("cli_path", ""),
-            timeout=config["claude"].get("timeout", 300),
-            mcp_config=config["claude"].get("mcp_servers"),
-        )
+        self._bridge = ClaudeBridge(config["claude"])
         self._max_msg_len = config["telegram"].get("max_message_length", 4096)
         self._session_timeout = config["session"].get("timeout_minutes", 60)
 
@@ -102,9 +99,11 @@ class TelegramBot:
 
         user_id = update.effective_user.id
         user_text = update.message.text
+        logger.info("[TELEGRAM → CLAUDE] user=%d msg=%s", user_id, user_text[:200])
 
         # Get or create session
         conv_id, session_id = await get_or_create_session(user_id, self._session_timeout)
+        logger.info("[SESSION] conv_id=%d session_id=%s", conv_id, session_id)
 
         # Save user message
         await save_message(conv_id, "user", user_text)
@@ -134,13 +133,15 @@ class TelegramBot:
 
         # Call Claude
         try:
-            response = await self._bridge.send_prompt(user_text, session_id)
+            response = await self._bridge.send_prompt(user_text, session_id, conv_id)
         finally:
             stop_typing.set()
             await typing_task
 
         # Save assistant response
         await save_message(conv_id, "assistant", response)
+        logger.info("[CLAUDE → TELEGRAM] user=%d response_len=%d response=%s",
+                     user_id, len(response), response[:500])
 
         # Send response back (split if needed)
         chunks = split_message(response, self._max_msg_len)
@@ -173,7 +174,14 @@ class TelegramBot:
                     logger.warning("Could not send startup message to %d: %s", user_id, e)
             logger.info("Startup messages sent.")
 
+        bridge = self._bridge
+
+        async def post_shutdown(application):
+            await bridge.close()
+            logger.info("MCP bridge shut down.")
+
         app.post_init = post_init
+        app.post_shutdown = post_shutdown
 
         logger.info("Bot starting...")
         app.run_polling()
